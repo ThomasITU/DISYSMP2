@@ -37,6 +37,7 @@ func main() {
 	for {
 		var input string
 		fmt.Scanln(&input)
+		fmt.Println(input)
 		PublishFromClient(input, ctx, chat)
 	}
 }
