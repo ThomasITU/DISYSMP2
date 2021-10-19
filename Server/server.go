@@ -35,6 +35,7 @@ type Server struct {
 type bufferedMessage struct {
 	message         string
 	vectorTimeStamp []int32
+	clientId        int32
 }
 
 func main() {
@@ -68,7 +69,7 @@ func (s *Server) GetBroadcast(ctx context.Context, _ *ChittyChat.GetBroadcastReq
 	} else {
 		broadCastBuffer <- latestBroadcast
 	}
-	return &ChittyChat.Response{Msg: latestBroadcast.message, ClientsConnected: latestBroadcast.vectorTimeStamp}, nil
+	return &ChittyChat.Response{Msg: latestBroadcast.message, ClientsConnected: latestBroadcast.vectorTimeStamp, ClientId: latestBroadcast.clientId}, nil
 }
 
 func (s *Server) Publish(ctx context.Context, message *ChittyChat.PublishRequest) (*ChittyChat.Response, error) {
@@ -114,7 +115,7 @@ func Broadcast(msg string, clientId int) {
 	vectorClock := clientsConnectedVectorClocks
 	lock.Unlock()
 
-	broadCastBuffer <- bufferedMessage{message: msg, vectorTimeStamp: vectorClock}
+	broadCastBuffer <- bufferedMessage{message: msg, vectorTimeStamp: vectorClock, clientId: int32(clientId)}
 }
 
 // help method

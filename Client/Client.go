@@ -68,6 +68,10 @@ func GetBroadcast(ctx context.Context, chat ChittyChat.ChittyChatServiceClient) 
 		}
 
 		vectorClockFromServer := response.GetClientsConnected()
+		if len(vectorClockFromServer) > len(lastestVectorTimeStamp) {
+			Logger(response.Msg+", by "+strconv.Itoa(int(response.GetClientId()))+", vectorClock: "+FormatVectorClock(lastestVectorTimeStamp), clientLogFile+strconv.Itoa(clientId))
+			continue
+		}
 		broadCastIsNewer := false
 		for i := 0; i < len(vectorClockFromServer); i++ {
 			if vectorClockFromServer[i] < lastestVectorTimeStamp[i] {
