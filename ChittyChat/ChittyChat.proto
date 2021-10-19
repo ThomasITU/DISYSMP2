@@ -1,0 +1,20 @@
+syntax = "proto3";
+package ChittyChat;
+
+option go_package = "./ChittyChat";
+
+service ChittChatService {
+
+    rpc Publish (publishRequest) returns (response);
+
+}
+
+message response{
+    string name = 1;
+}
+
+message publishRequest {
+    string request = 1;
+}
+
+
