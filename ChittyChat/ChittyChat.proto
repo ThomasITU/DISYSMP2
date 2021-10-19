@@ -6,14 +6,21 @@ option go_package = "./ChittyChat";
 service ChittyChatService {
 
     rpc Publish (publishRequest) returns (response);
+    rpc GetBroadCast (broadcastRequest) returns (response);
 
 }
 
 message response{
     string name = 1;
+    repeated int32 clientsConnected = 2;
 }
 
 message publishRequest {
+    string request = 1;
+    int32 clientId = 2;
+}
+
+message broadcastRequest{
     string request = 1;
 }
 

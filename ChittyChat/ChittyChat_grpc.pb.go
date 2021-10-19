@@ -19,6 +19,7 @@ const _ = grpc.SupportPackageIsVersion7
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 type ChittyChatServiceClient interface {
 	Publish(ctx context.Context, in *PublishRequest, opts ...grpc.CallOption) (*Response, error)
+	GetBroadCast(ctx context.Context, in *BroadcastRequest, opts ...grpc.CallOption) (*Response, error)
 }
 
 type chittyChatServiceClient struct {
@@ -38,11 +39,21 @@ func (c *chittyChatServiceClient) Publish(ctx context.Context, in *PublishReques
 	return out, nil
 }
 
+func (c *chittyChatServiceClient) GetBroadCast(ctx context.Context, in *BroadcastRequest, opts ...grpc.CallOption) (*Response, error) {
+	out := new(Response)
+	err := c.cc.Invoke(ctx, "/ChittyChat.ChittyChatService/GetBroadCast", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // ChittyChatServiceServer is the server API for ChittyChatService service.
 // All implementations must embed UnimplementedChittyChatServiceServer
 // for forward compatibility
 type ChittyChatServiceServer interface {
 	Publish(context.Context, *PublishRequest) (*Response, error)
+	GetBroadCast(context.Context, *BroadcastRequest) (*Response, error)
 	mustEmbedUnimplementedChittyChatServiceServer()
 }
 
@@ -52,6 +63,9 @@ type UnimplementedChittyChatServiceServer struct {
 
 func (UnimplementedChittyChatServiceServer) Publish(context.Context, *PublishRequest) (*Response, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method Publish not implemented")
+}
+func (UnimplementedChittyChatServiceServer) GetBroadCast(context.Context, *BroadcastRequest) (*Response, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method GetBroadCast not implemented")
 }
 func (UnimplementedChittyChatServiceServer) mustEmbedUnimplementedChittyChatServiceServer() {}
 
@@ -84,6 +98,24 @@ func _ChittyChatService_Publish_Handler(srv interface{}, ctx context.Context, de
 	return interceptor(ctx, in, info, handler)
 }
 
+func _ChittyChatService_GetBroadCast_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(BroadcastRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ChittyChatServiceServer).GetBroadCast(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/ChittyChat.ChittyChatService/GetBroadCast",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ChittyChatServiceServer).GetBroadCast(ctx, req.(*BroadcastRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // ChittyChatService_ServiceDesc is the grpc.ServiceDesc for ChittyChatService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -94,6 +126,10 @@ var ChittyChatService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "Publish",
 			Handler:    _ChittyChatService_Publish_Handler,
+		},
+		{
+			MethodName: "GetBroadCast",
+			Handler:    _ChittyChatService_GetBroadCast_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},
