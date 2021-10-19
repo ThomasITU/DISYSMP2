@@ -3,7 +3,7 @@ package ChittyChat;
 
 option go_package = "./ChittyChat";
 
-service ChittChatService {
+service ChittyChatService {
 
     rpc Publish (publishRequest) returns (response);
 
