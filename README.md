@@ -9,12 +9,15 @@ ASK TA
 - er der en smartere måde at broadcaste på end at clienten lytter i et for evigheds loop
 
 
-Commands
-proto:
+#Commands
+##proto:
 -- protoc --go_out=. --go_opt=paths=source_relative --go-grpc_out=. --go-grpc_opt=paths=source_relative ChittyChat/ChittyChat.proto 
 
-docker:
+## docker:
 
-docker build -t test .
+- $env:DOCKER_BUILDKIT=1
 
-docker run -p 8080:8080 -tid test
+- docker build -t test .
+
+- docker run -p 8080:8080 -tid test
+
