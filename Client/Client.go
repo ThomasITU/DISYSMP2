@@ -70,6 +70,7 @@ func GetBroadcast(ctx context.Context, chat ChittyChat.ChittyChatServiceClient) 
 		vectorClockFromServer := response.GetClientsConnected()
 		if len(vectorClockFromServer) > len(lastestVectorTimeStamp) {
 			Logger(response.Msg+", by "+strconv.Itoa(int(response.GetClientId()))+", vectorClock: "+FormatVectorClock(lastestVectorTimeStamp), clientLogFile+strconv.Itoa(clientId))
+			lastestVectorTimeStamp = vectorClockFromServer
 			continue
 		}
 		broadCastIsNewer := false
@@ -81,8 +82,8 @@ func GetBroadcast(ctx context.Context, chat ChittyChat.ChittyChatServiceClient) 
 		}
 
 		// print
-		log.Println(response.Msg + ", vectorClock: " + FormatVectorClock(lastestVectorTimeStamp))
-		Logger(response.Msg+", vectorClock: "+FormatVectorClock(lastestVectorTimeStamp), clientLogFile+strconv.Itoa(clientId))
+		// log.Println(response.Msg + ", vectorClock: " + FormatVectorClock(lastestVectorTimeStamp))
+		// Logger(response.Msg+", vectorClock: "+FormatVectorClock(lastestVectorTimeStamp), clientLogFile+strconv.Itoa(clientId))
 		if broadCastIsNewer {
 			log.Println(response.Msg + ", vectorClock: " + FormatVectorClock(lastestVectorTimeStamp))
 		}
@@ -123,6 +124,7 @@ func FormatVectorClock(clock []int32) string {
 	sb.WriteString("<")
 	for i := 0; i < len(clock); i++ {
 		sb.WriteString(strconv.Itoa(int(clock[i])))
+		sb.WriteString(", ")
 	}
 	sb.WriteString(">")
 	return sb.String()
