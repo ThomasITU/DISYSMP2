@@ -123,10 +123,11 @@ func FormatVectorClock(clock []int32) string {
 	var sb = strings.Builder{}
 	sb.WriteString("<")
 	for i := 0; i < len(clock); i++ {
+		sb.WriteString(" ")
 		sb.WriteString(strconv.Itoa(int(clock[i])))
-		sb.WriteString(", ")
+		sb.WriteString(",")
 	}
-	sb.WriteString(">")
+	sb.WriteString(" >")
 	return sb.String()
 }
 
