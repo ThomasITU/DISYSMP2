@@ -6,12 +6,13 @@ option go_package = "./ChittyChat";
 service ChittyChatService {
 
     rpc Publish (publishRequest) returns (response);
-    rpc GetBroadCast (broadcastRequest) returns (response);
-
+    rpc GetBroadcast (getBroadcastRequest) returns (response);
+    rpc JoinChat (joinChatRequest) returns (JoinResponse);
+    rpc LeaveChat (leaveChatRequest) returns (leaveResponse);
 }
 
 message response{
-    string name = 1;
+    string msg = 1;
     repeated int32 clientsConnected = 2;
 }
 
@@ -20,8 +21,16 @@ message publishRequest {
     int32 clientId = 2;
 }
 
-message broadcastRequest{
-    string request = 1;
+message leaveChatRequest {
+    int32  clientId = 1;
+}
+message JoinResponse{
+    int32  clientId = 1;
+}
+message leaveResponse{
+    string msg = 1;
 }
 
-
+// doesnt take parameters
+message getBroadcastRequest{}
+message joinChatRequest {}
