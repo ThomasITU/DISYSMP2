@@ -10,6 +10,11 @@ import (
 	"google.golang.org/grpc"
 )
 
+type bufferedMessage struct {
+	message         string
+	vectorTimeStamp []int
+}
+
 const (
 	address = "localhost:8080"
 )
@@ -37,14 +42,16 @@ func main() {
 	for {
 		var input string
 		fmt.Scanln(&input)
-		fmt.Println(input)
+
 		PublishFromClient(input, ctx, chat)
 	}
 }
 
-func GetBroadcast(buffer chan (string), ctx context.Context, chat ChittyChat.ChittyChatServiceClient) {
+func GetBroadcast(buffer chan bufferedMessage, ctx context.Context, chat ChittyChat.ChittyChatServiceClient) {
+
 	for {
 		time.Sleep(time.Second * 5)
+		//chat.GetBroadCast(ctx, )
 	}
 }
 
