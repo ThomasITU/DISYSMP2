@@ -77,49 +77,61 @@ func (s *Server) GetBroadcast(ctx context.Context, _ *ChittyChat.GetBroadcastReq
 func (s *Server) Publish(ctx context.Context, message *ChittyChat.PublishRequest) (*ChittyChat.Response, error) {
 	validateMessage, err := ValidateMessage(message.GetRequest())
 	if validateMessage {
-		Logger("Request by: "+strconv.Itoa(int(message.GetClientId()))+" was accepted", clientsConnectedVectorClocks, serverLogFile)
+		//logging
+		msg := "Request by: " + strconv.Itoa(int(message.GetClientId())) + " was accepted"
+		Logger(msg, clientsConnectedVectorClocks, serverLogFile)
+
 		Broadcast(message.GetRequest(), int(message.GetClientId()))
-		return &ChittyChat.Response{Msg: "Request was accepted, and is being broadcasted"}, nil
+		return &ChittyChat.Response{Msg: "Request was accepted"}, nil
 	} else {
-		Logger(err.Error(), clientsConnectedVectorClocks, "ServerErrorLog")
+		//logging
+		msg := message.GetRequest() + ", error msg " + err.Error()
+		Logger(msg, clientsConnectedVectorClocks, "ServerErrorLog")
+
 		return &ChittyChat.Response{Msg: err.Error()}, err
 	}
 }
 
 func (s *Server) JoinChat(ctx context.Context, _ *ChittyChat.JoinChatRequest) (*ChittyChat.JoinResponse, error) {
 
+	// add a client
 	clientsConnectedVectorClocks = append(clientsConnectedVectorClocks, 0)
 	clientId := clientCount
 	clientCount++
 
+	//logging
 	msg := "client: " + strconv.Itoa(clientId) + ", succesfully joined the chat"
 	Logger(msg, clientsConnectedVectorClocks, serverLogFile)
-	Broadcast(msg, clientId)
 
+	Broadcast(msg, clientId)
 	return &ChittyChat.JoinResponse{ClientId: int32(clientId)}, nil
 }
 
 func (s *Server) LeaveChat(ctx context.Context, request *ChittyChat.LeaveChatRequest) (*ChittyChat.LeaveResponse, error) {
 	clientId := request.GetClientId()
+
+	//logging
 	msg := "client: " + strconv.Itoa(int(clientId)) + ", succesfully left the chat"
 	Logger(msg, clientsConnectedVectorClocks, serverLogFile)
 
-	// "removing client" by vectorClock at clientId to 0
-	// think of something better
+	// "removing client" by setting vectorClock at clientId to 0 -- think of something better
 	clientsConnectedVectorClocks[clientId] = 0
-	Broadcast(msg, int(clientId))
 
+	Broadcast(msg, int(clientId))
 	return &ChittyChat.LeaveResponse{Msg: msg}, nil
 }
 
 func Broadcast(msg string, clientId int) {
-	//locking since using global variables, we probably should think of something different?
+	//locking because using global variables is scary, we probably should think of something different?
 	lock.Lock()
 
+	// increment clock and add latest broadcast to the buffer
 	clientsConnectedVectorClocks[clientId]++
 	vectorClock := clientsConnectedVectorClocks
 	broadCastBuffer <- bufferedMessage{message: msg, vectorTimeStamp: vectorClock, clientId: int32(clientId)}
-	Logger(msg+", "+strconv.Itoa(clientId), vectorClock, serverLogFile)
+
+	//logging
+	Logger(msg+", by: "+strconv.Itoa(clientId), vectorClock, serverLogFile)
 
 	lock.Unlock()
 }

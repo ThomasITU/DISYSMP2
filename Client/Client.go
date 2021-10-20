@@ -70,24 +70,22 @@ func GetBroadcast(ctx context.Context, chat ChittyChat.ChittyChatServiceClient) 
 			continue
 		}
 
+		// intent check vector clock to adjust latest broadcast
 		broadCastIsNewer := false
 		vectorClockFromServer := response.GetClientsConnected()
 		if len(vectorClockFromServer) > len(lastestClientVectorTimeStamp) {
 			broadCastIsNewer = true
 		}
 
-		// intent check vector clock to adjust latest broadcast
 	latest:
 		for i := 0; i < len(vectorClockFromServer); i++ {
 			if broadCastIsNewer {
-				fmt.Println(i)
 				break latest
 			}
 			if vectorClockFromServer[i] > lastestClientVectorTimeStamp[i] {
 				broadCastIsNewer = true
 			}
 		}
-
 		if broadCastIsNewer {
 			lastestClientVectorTimeStamp = vectorClockFromServer
 			msg := response.Msg + ", by " + strconv.Itoa(int(response.GetClientId()))
