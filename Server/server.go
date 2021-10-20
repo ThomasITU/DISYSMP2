@@ -42,20 +42,23 @@ type bufferedMessage struct {
 func main() {
 
 	//init
-	clientsConnectedVectorClocks = make([]int32, 0, 0)
+	clientsConnectedVectorClocks = make([]int32, 0, 1)
 	broadCastBuffer = make(chan bufferedMessage, 10)
 	lock = sync.Mutex{}
+	grpcServer := grpc.NewServer()
 
-	//setup listener on port
+	//setup listen on port
 	lis, err := net.Listen("tcp", port)
 	if err != nil {
 		log.Fatalf("failed to listen: %v", err)
 	}
 
-	grpcServer := grpc.NewServer()
+	// constantly updating the latestBroadCast
 	go EvalLatestBroadCast(broadCastBuffer)
 
 	Logger("server is running", clientsConnectedVectorClocks, serverLogFile)
+
+	// start the service / server on the specific port
 	ChittyChat.RegisterChittyChatServiceServer(grpcServer, &Server{})
 	if err := grpcServer.Serve(lis); err != nil {
 		log.Fatalf("Failed to serve gRPC server over port %s  %v", port, err)
@@ -64,7 +67,6 @@ func main() {
 }
 
 func (s *Server) GetBroadcast(ctx context.Context, _ *ChittyChat.GetBroadcastRequest) (*ChittyChat.Response, error) {
-	// intent tag det seneste broadcast ud i en var, og tilføj det til broadcastchannel igen, så næste GetBroadcast også får den nyeste
 	if len(latestBroadCast.vectorTimeStamp) < 1 {
 		return nil, errors.New("no broadcasts")
 	}
@@ -102,8 +104,8 @@ func (s *Server) LeaveChat(ctx context.Context, request *ChittyChat.LeaveChatReq
 	msg := "client: " + strconv.Itoa(int(clientId)) + ", succesfully left the chat"
 	Logger(msg, clientsConnectedVectorClocks, serverLogFile)
 
-	// "remove client" setting vectorClock at clientId to 0
-
+	// "removing client" by vectorClock at clientId to 0
+	// think of something better
 	clientsConnectedVectorClocks[clientId] = 0
 	Broadcast(msg, int(clientId))
 
@@ -111,12 +113,14 @@ func (s *Server) LeaveChat(ctx context.Context, request *ChittyChat.LeaveChatReq
 }
 
 func Broadcast(msg string, clientId int) {
-
+	//locking since using global variables, we probably should think of something different?
 	lock.Lock()
+
 	clientsConnectedVectorClocks[clientId]++
 	vectorClock := clientsConnectedVectorClocks
 	broadCastBuffer <- bufferedMessage{message: msg, vectorTimeStamp: vectorClock, clientId: int32(clientId)}
 	Logger(msg+", "+strconv.Itoa(clientId), vectorClock, serverLogFile)
+
 	lock.Unlock()
 }
 
@@ -126,40 +130,22 @@ func EvalLatestBroadCast(broadCastBuffer chan (bufferedMessage)) {
 		select {
 		case temp := <-broadCastBuffer:
 			latestBroadCast = temp
-			fmt.Println("new broadcast")
+			fmt.Println("new broadcast by, " + strconv.Itoa(int(temp.clientId)) + ": " + temp.message)
 		default:
-			//time.Sleep(time.Millisecond * 50)
 		}
 	}
+}
 
-	// for {
-	// Select:
-	// 	select {
-	// 	case recent := <-broadCastBuffer:
-	// 		broadCastIsNewer := false
-	// 		broadCastIsLatest := true
-	// 		if len(clientsConnectedVectorClocks) < len(recent.vectorTimeStamp) {
-	// 			break Select
-	// 		}
-	// 		for i := 0; i < len(clientsConnectedVectorClocks); i++ {
-	// 			if clientsConnectedVectorClocks[i] < recent.vectorTimeStamp[i] {
-	// 				broadCastIsNewer = true
-	// 				clientsConnectedVectorClocks[i] = recent.vectorTimeStamp[i]
-	// 			}
-	// 			if clientsConnectedVectorClocks[i] != recent.vectorTimeStamp[i] {
-	// 				broadCastIsLatest = false
-	// 			}
-	// 		}
-	// 		if broadCastIsNewer || broadCastIsLatest {
-	// 			fmt.Println("broadCastIsNewer or broadcast is latestBroadcast")
-	// 			broadCastBuffer <- recent
-	// 			time.Sleep(time.Millisecond * 250)
-	// 		}
-	// 	default:
-	// 		// If nothing is in the buffer sleep 0.25 seconds
-	// 		time.Sleep(time.Millisecond * 250)
-	// 	}
-	// }
+func ValidateMessage(message string) (bool, error) {
+	valid := utf8.Valid([]byte(message))
+	if !valid {
+		fmt.Println(message)
+		return false, errors.New("not UTF-8")
+	}
+	if len(message) > 128 {
+		return false, errors.New("too long")
+	}
+	return true, nil
 }
 
 func Logger(message string, vectorClock []int32, logFileName string) {
@@ -173,16 +159,6 @@ func Logger(message string, vectorClock []int32, logFileName string) {
 	log.Println(message + ", VectorClock: " + FormatVectorClock(vectorClock))
 }
 
-func ValidateMessage(message string) (bool, error) {
-	valid := utf8.Valid([]byte(message))
-	if valid == false {
-		return false, errors.New("not UTF-8")
-	}
-	if len(message) > 128 {
-		return false, errors.New("too long")
-	}
-	return true, nil
-}
 func FormatVectorClock(clock []int32) string {
 	var sb = strings.Builder{}
 	sb.WriteString("<")

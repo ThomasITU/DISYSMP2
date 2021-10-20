@@ -3,6 +3,7 @@ package main
 import (
 	"bufio"
 	"context"
+	"fmt"
 	"log"
 	"os"
 	"strconv"
@@ -13,11 +14,6 @@ import (
 	"google.golang.org/grpc"
 )
 
-type bufferedMessage struct {
-	message         string
-	vectorTimeStamp []int
-}
-
 const (
 	address       = "localhost:8080"
 	clientLogFile = "clientLogId_"
@@ -26,10 +22,10 @@ const (
 var (
 	clientId                     int
 	lastestClientVectorTimeStamp []int32
-	buffer                       chan (bufferedMessage)
 )
 
 func main() {
+	// init
 	// Set up a connection to the server.
 	conn, err := grpc.Dial(address, grpc.WithInsecure(), grpc.WithBlock())
 	if err != nil {
@@ -40,19 +36,19 @@ func main() {
 	// create client
 	chat := ChittyChat.NewChittyChatServiceClient(conn)
 	ctx := context.Background()
+
 	JoinChat(ctx, chat)
 
-	buffer = make(chan bufferedMessage, 10)
-
+	// constantly trying to get latest broadcast
 	go GetBroadcast(ctx, chat)
 
 	for {
-		// to ensure "enter" has been hit before publishing - skud ud til mie
+		// to ensure "enter" has been hit before publishing - skud ud til Mie
 		reader, err := bufio.NewReader(os.Stdin).ReadString('\n')
 		// remove newline windows format "\r\n"
 		input := strings.TrimSuffix(reader, "\r\n")
 		if err != nil {
-			Logger("bad bufio input", clientLogFile)
+			Logger("bad bufio input", FormatLogFile(clientId))
 		}
 		if len(input) > 0 {
 			PublishFromClient(input, ctx, chat)
@@ -68,29 +64,34 @@ func GetBroadcast(ctx context.Context, chat ChittyChat.ChittyChatServiceClient) 
 
 		response, err := chat.GetBroadcast(ctx, &ChittyChat.GetBroadcastRequest{})
 		if err != nil && (err != latestError || latestError == nil) {
+			// to avoid spamming the log with the same error
 			latestError = err
-			Logger(err.Error(), clientLogFile+strconv.Itoa(clientId))
+			Logger(err.Error(), FormatLogFile(clientId))
 			continue
 		}
 
+		broadCastIsNewer := false
 		vectorClockFromServer := response.GetClientsConnected()
 		if len(vectorClockFromServer) > len(lastestClientVectorTimeStamp) {
-			lastestClientVectorTimeStamp = vectorClockFromServer
-			Logger(response.Msg+", by "+strconv.Itoa(int(response.GetClientId()))+", vectorClock: "+FormatVectorClock(lastestClientVectorTimeStamp), clientLogFile+strconv.Itoa(clientId))
-			continue
+			broadCastIsNewer = true
 		}
 
 		// intent check vector clock to adjust latest broadcast
-		broadCastIsNewer := false
+	latest:
 		for i := 0; i < len(vectorClockFromServer); i++ {
+			if broadCastIsNewer {
+				fmt.Println(i)
+				break latest
+			}
 			if vectorClockFromServer[i] > lastestClientVectorTimeStamp[i] {
-				//fmt.Println("broadcast is newer")
 				broadCastIsNewer = true
 			}
 		}
+
 		if broadCastIsNewer {
 			lastestClientVectorTimeStamp = vectorClockFromServer
-			Logger(response.Msg+", by "+strconv.Itoa(int(response.GetClientId()))+", vectorClock: "+FormatVectorClock(lastestClientVectorTimeStamp), clientLogFile+strconv.Itoa(clientId))
+			msg := response.Msg + ", by " + strconv.Itoa(int(response.GetClientId()))
+			LoggerVectorClock(msg, lastestClientVectorTimeStamp, FormatLogFile(clientId))
 		}
 	}
 }
@@ -99,22 +100,27 @@ func PublishFromClient(input string, ctx context.Context, chittyServer ChittyCha
 	inputFromClient := &ChittyChat.PublishRequest{Request: input, ClientId: int32(clientId)}
 	response, err := chittyServer.Publish(ctx, inputFromClient)
 	checkErr(err)
-	//fmt.Println(input + ", published")
-	log.Println(response.GetMsg())
+
+	LoggerVectorClock(response.GetMsg(), lastestClientVectorTimeStamp, FormatLogFile(clientId))
 }
 
 func JoinChat(ctx context.Context, chittyServer ChittyChat.ChittyChatServiceClient) {
 	response, err := chittyServer.JoinChat(ctx, &ChittyChat.JoinChatRequest{})
 	checkErr(err)
+
 	clientId = int(response.GetClientId())
-	log.Printf("connected with id: %v", clientId)
+
+	msg := fmt.Sprintf("connected with id: %v", clientId)
+	Logger(msg, FormatLogFile(clientId))
 }
 
 func LeaveChat(ctx context.Context, chittyServer ChittyChat.ChittyChatServiceClient) {
 
 	response, err := chittyServer.LeaveChat(ctx, &ChittyChat.LeaveChatRequest{ClientId: int32(clientId)})
 	checkErr(err)
-	log.Println(response.GetMsg())
+
+	msg := fmt.Sprintf("%s, %v", response.GetMsg(), clientId)
+	Logger(msg, FormatLogFile(clientId))
 }
 
 //help methods
@@ -136,6 +142,10 @@ func FormatVectorClock(clock []int32) string {
 	return sb.String()
 }
 
+func FormatLogFile(clientId int) string {
+	return fmt.Sprintf("%s%v", clientLogFile, clientId)
+}
+
 func Logger(message string, logFileName string) {
 	f, err := os.OpenFile(logFileName, os.O_RDWR|os.O_CREATE|os.O_APPEND, 0666)
 	if err != nil {
@@ -145,4 +155,8 @@ func Logger(message string, logFileName string) {
 
 	log.SetOutput(f)
 	log.Println(message)
+}
+
+func LoggerVectorClock(message string, vectorClock []int32, logFileName string) {
+	Logger(message+", VectorClock: "+FormatVectorClock(vectorClock), logFileName)
 }
