@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"errors"
+	"fmt"
 	"log"
 	"net"
 	"os"
@@ -17,7 +18,7 @@ import (
 )
 
 const (
-	port          = ":9080"
+	port          = ":8080"
 	serverLogFile = "serverLog"
 )
 
@@ -26,6 +27,7 @@ var (
 	broadCastBuffer              chan (bufferedMessage)
 	clientCount                  int
 	lock                         sync.Mutex
+	latestBroadCast              bufferedMessage
 )
 
 type Server struct {
@@ -63,23 +65,27 @@ func main() {
 }
 
 func (s *Server) GetBroadcast(ctx context.Context, _ *ChittyChat.GetBroadcastRequest) (*ChittyChat.Response, error) {
-	latestBroadcast := <-broadCastBuffer
-	if len(latestBroadcast.vectorTimeStamp) < 0 {
-		return nil, errors.New("no recent broadcasts")
-	} else {
-		broadCastBuffer <- latestBroadcast
+	// intent tag det seneste broadcast ud i en var, og tilføj det til broadcastchannel igen, så næste GetBroadcast også får den nyeste
+	// latestBroadcast := <-broadCastBuffer
+	if len(latestBroadCast.vectorTimeStamp) < 1 {
+		return nil, errors.New("no broadcasts")
 	}
-	return &ChittyChat.Response{Msg: latestBroadcast.message, ClientsConnected: latestBroadcast.vectorTimeStamp, ClientId: latestBroadcast.clientId}, nil
+
+	// else {
+	// 	broadCastBuffer <- latestBroadCast
+	// }
+
+	return &ChittyChat.Response{Msg: latestBroadCast.message, ClientsConnected: latestBroadCast.vectorTimeStamp, ClientId: latestBroadCast.clientId}, nil
 }
 
 func (s *Server) Publish(ctx context.Context, message *ChittyChat.PublishRequest) (*ChittyChat.Response, error) {
 	validateMessage, err := ValidateMessage(message.GetRequest())
 	if validateMessage {
-		Logger("Request was accepted, and is being broadcasted, "+strconv.Itoa(int(message.GetClientId())), serverLogFile)
+		Logger("Request by: "+strconv.Itoa(int(message.GetClientId()))+" was accepted", clientsConnectedVectorClocks, serverLogFile)
 		Broadcast(message.GetRequest(), int(message.GetClientId()))
 		return &ChittyChat.Response{Msg: "Request was accepted, and is being broadcasted"}, nil
 	} else {
-		Logger(err.Error(), "errorLog")
+		Logger(err.Error(), clientsConnectedVectorClocks, "ServerErrorLog")
 		return &ChittyChat.Response{Msg: err.Error()}, err
 	}
 }
@@ -90,65 +96,79 @@ func (s *Server) JoinChat(ctx context.Context, _ *ChittyChat.JoinChatRequest) (*
 	clientId := clientCount
 	clientCount++
 
-	msg := "client: " + strconv.Itoa(clientId) + " succesfully joined the chat"
-	Logger(msg+", vectorClock: "+FormatVectorClock(clientsConnectedVectorClocks), serverLogFile)
+	msg := "client: " + strconv.Itoa(clientId) + ", succesfully joined the chat"
+	Logger(msg, clientsConnectedVectorClocks, serverLogFile)
+	Broadcast(msg, clientId)
 
 	return &ChittyChat.JoinResponse{ClientId: int32(clientId)}, nil
 }
 
 func (s *Server) LeaveChat(ctx context.Context, request *ChittyChat.LeaveChatRequest) (*ChittyChat.LeaveResponse, error) {
-
-	msg := "clientId succesfully left the chat"
-	Logger(msg+", vectorClock: "+FormatVectorClock(clientsConnectedVectorClocks), serverLogFile)
+	clientId := request.GetClientId()
+	msg := "client: " + strconv.Itoa(int(clientId)) + ", succesfully left the chat"
+	Logger(msg, clientsConnectedVectorClocks, serverLogFile)
 
 	// "remove client" setting vectorClock at clientId to 0
-	clientId := request.GetClientId()
+
 	clientsConnectedVectorClocks[clientId] = 0
+	Broadcast(msg, int(clientId))
+
 	return &ChittyChat.LeaveResponse{Msg: msg}, nil
 }
 
 func Broadcast(msg string, clientId int) {
-	Logger(msg+", "+strconv.Itoa(clientId), serverLogFile)
 
 	lock.Lock()
 	clientsConnectedVectorClocks[clientId]++
 	vectorClock := clientsConnectedVectorClocks
-	lock.Unlock()
-
 	broadCastBuffer <- bufferedMessage{message: msg, vectorTimeStamp: vectorClock, clientId: int32(clientId)}
+	Logger(msg+", "+strconv.Itoa(clientId), vectorClock, serverLogFile)
+	lock.Unlock()
 }
 
 // help method
 func EvalLatestBroadCast(broadCastBuffer chan (bufferedMessage)) {
 	for {
-	Select:
 		select {
-		case recent := <-broadCastBuffer:
-			broadCastIsNewer := false
-			broadCastIsLatest := true
-			if len(clientsConnectedVectorClocks) > len(recent.vectorTimeStamp) {
-				break Select
-			}
-			for i := 0; i < len(clientsConnectedVectorClocks); i++ {
-				if clientsConnectedVectorClocks[i] < recent.vectorTimeStamp[i] {
-					broadCastIsNewer = true
-					clientsConnectedVectorClocks[i] = recent.vectorTimeStamp[i]
-				}
-				if clientsConnectedVectorClocks[i] != recent.vectorTimeStamp[i] {
-					broadCastIsLatest = false
-				}
-			}
-			if broadCastIsNewer || broadCastIsLatest {
-				broadCastBuffer <- recent
-			}
+		case temp := <-broadCastBuffer:
+			latestBroadCast = temp
+			fmt.Println("reached temp")
 		default:
-			// If nothing is in the buffer sleep 0.25 seconds
-			time.Sleep(time.Millisecond * 250)
+			time.Sleep(time.Millisecond * 550)
 		}
 	}
+
+	// for {
+	// Select:
+	// 	select {
+	// 	case recent := <-broadCastBuffer:
+	// 		broadCastIsNewer := false
+	// 		broadCastIsLatest := true
+	// 		if len(clientsConnectedVectorClocks) < len(recent.vectorTimeStamp) {
+	// 			break Select
+	// 		}
+	// 		for i := 0; i < len(clientsConnectedVectorClocks); i++ {
+	// 			if clientsConnectedVectorClocks[i] < recent.vectorTimeStamp[i] {
+	// 				broadCastIsNewer = true
+	// 				clientsConnectedVectorClocks[i] = recent.vectorTimeStamp[i]
+	// 			}
+	// 			if clientsConnectedVectorClocks[i] != recent.vectorTimeStamp[i] {
+	// 				broadCastIsLatest = false
+	// 			}
+	// 		}
+	// 		if broadCastIsNewer || broadCastIsLatest {
+	// 			fmt.Println("broadCastIsNewer or broadcast is latestBroadcast")
+	// 			broadCastBuffer <- recent
+	// 			time.Sleep(time.Millisecond * 250)
+	// 		}
+	// 	default:
+	// 		// If nothing is in the buffer sleep 0.25 seconds
+	// 		time.Sleep(time.Millisecond * 250)
+	// 	}
+	// }
 }
 
-func Logger(message string, logFileName string) {
+func Logger(message string, vectorClock []int32, logFileName string) {
 	f, err := os.OpenFile(logFileName, os.O_RDWR|os.O_CREATE|os.O_APPEND, 0666)
 	if err != nil {
 		log.Fatalf("error opening file: %v", err)
@@ -156,7 +176,7 @@ func Logger(message string, logFileName string) {
 	defer f.Close()
 
 	log.SetOutput(f)
-	log.Println(message)
+	log.Println(message + ", VectorClock: " + FormatVectorClock(vectorClock))
 }
 
 func ValidateMessage(message string) (bool, error) {
@@ -169,14 +189,6 @@ func ValidateMessage(message string) (bool, error) {
 	}
 	return true, nil
 }
-
-func Check(err error, message string) {
-	if err != nil {
-		panic(err)
-	}
-	log.Printf("%s\n", message)
-}
-
 func FormatVectorClock(clock []int32) string {
 	var sb = strings.Builder{}
 	sb.WriteString("<")
