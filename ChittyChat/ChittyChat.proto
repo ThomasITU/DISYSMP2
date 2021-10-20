@@ -13,13 +13,14 @@ service ChittyChatService {
 
 message response{
     string msg = 1;
-    repeated int32 clientsConnected = 2;
-    int32 clientId = 3;
+    int32 clientId = 2;
+    repeated int32 clientsConnected = 3;
 }
 
 message publishRequest {
     string request = 1;
     int32 clientId = 2;
+    repeated int32 clientsConnected = 3;
 }
 
 message leaveChatRequest {

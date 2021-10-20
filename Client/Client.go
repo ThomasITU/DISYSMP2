@@ -64,7 +64,7 @@ func GetBroadcast(ctx context.Context, chat ChittyChat.ChittyChatServiceClient) 
 	var latestError error
 	for {
 		//overvej at sende alle de seneste broadcasts, sorter lokalt ved clienten via lamport/vector clock
-		time.Sleep(time.Second * 1)
+		time.Sleep(time.Millisecond * 50)
 
 		response, err := chat.GetBroadcast(ctx, &ChittyChat.GetBroadcastRequest{})
 		if err != nil && (err != latestError || latestError == nil) {

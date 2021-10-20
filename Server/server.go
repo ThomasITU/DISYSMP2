@@ -10,7 +10,6 @@ import (
 	"strconv"
 	"strings"
 	"sync"
-	"time"
 	"unicode/utf8"
 
 	"github.com/lottejd/DISYSMP2/ChittyChat"
@@ -54,9 +53,9 @@ func main() {
 	}
 
 	grpcServer := grpc.NewServer()
-
 	go EvalLatestBroadCast(broadCastBuffer)
 
+	Logger("server is running", clientsConnectedVectorClocks, serverLogFile)
 	ChittyChat.RegisterChittyChatServiceServer(grpcServer, &Server{})
 	if err := grpcServer.Serve(lis); err != nil {
 		log.Fatalf("Failed to serve gRPC server over port %s  %v", port, err)
@@ -66,16 +65,11 @@ func main() {
 
 func (s *Server) GetBroadcast(ctx context.Context, _ *ChittyChat.GetBroadcastRequest) (*ChittyChat.Response, error) {
 	// intent tag det seneste broadcast ud i en var, og tilføj det til broadcastchannel igen, så næste GetBroadcast også får den nyeste
-	// latestBroadcast := <-broadCastBuffer
 	if len(latestBroadCast.vectorTimeStamp) < 1 {
 		return nil, errors.New("no broadcasts")
 	}
 
-	// else {
-	// 	broadCastBuffer <- latestBroadCast
-	// }
-
-	return &ChittyChat.Response{Msg: latestBroadCast.message, ClientsConnected: latestBroadCast.vectorTimeStamp, ClientId: latestBroadCast.clientId}, nil
+	return &ChittyChat.Response{Msg: latestBroadCast.message, ClientId: latestBroadCast.clientId, ClientsConnected: latestBroadCast.vectorTimeStamp}, nil
 }
 
 func (s *Server) Publish(ctx context.Context, message *ChittyChat.PublishRequest) (*ChittyChat.Response, error) {
@@ -132,9 +126,9 @@ func EvalLatestBroadCast(broadCastBuffer chan (bufferedMessage)) {
 		select {
 		case temp := <-broadCastBuffer:
 			latestBroadCast = temp
-			fmt.Println("reached temp")
+			fmt.Println("new broadcast")
 		default:
-			time.Sleep(time.Millisecond * 550)
+			//time.Sleep(time.Millisecond * 50)
 		}
 	}
 
