@@ -19,7 +19,7 @@ type bufferedMessage struct {
 }
 
 const (
-	address       = "localhost:8080"
+	address       = "localhost:9080"
 	clientLogFile = "clientLogId_"
 )
 
