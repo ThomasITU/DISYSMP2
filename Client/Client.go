@@ -44,10 +44,11 @@ func main() {
 
 	for {
 		// to ensure "enter" has been hit before publishing - skud ud til Mie
-		reader, err := bufio.NewReader(os.Stdin).ReadString('\n')
 		// remove newline windows format "\r\n"
+		reader, err := bufio.NewReader(os.Stdin).ReadString('\n')
 		input := strings.TrimSuffix(reader, "\r\n")
 		//inputMac := strings.TrimSuffix(reader, "\n");
+
 		if err != nil {
 			Logger("bad bufio input", FormatLogFile(clientId))
 		}
@@ -63,15 +64,12 @@ func main() {
 				checkErr(err)
 				LoggerVectorClock(response.Msg, lastestClientVectorTimeStamp, clientLogFile)
 
-				//TODO - se lige hvad der sker når man kalder Exit
 				time.Sleep(500 * time.Millisecond)
 				os.Exit(0)
-
 			}
 
 		}
 		if len(input) > 0 {
-			//TODO broadcastes mellemrum?
 			PublishFromClient(input, ctx, chat)
 		}
 	}
@@ -81,14 +79,19 @@ func GetBroadcast(ctx context.Context, chat ChittyChat.ChittyChatServiceClient) 
 	var latestError error
 	for {
 		//overvej at sende alle de seneste broadcasts, sorter lokalt ved clienten via lamport/vector clock
-		time.Sleep(time.Millisecond * 50)
+		time.Sleep(time.Millisecond * 30)
 
 		response, err := chat.GetBroadcast(ctx, &ChittyChat.GetBroadcastRequest{})
-		if err != nil && (err != latestError || latestError == nil) {
-			// to avoid spamming the log with the same error
-			latestError = err
-			Logger(err.Error(), FormatLogFile(clientId))
-			continue
+		if err != nil {
+			if err == latestError && latestError != nil {
+				// to avoid spamming the log with the same error
+				continue
+			} else {
+				latestError = err
+				Logger(err.Error(), FormatLogFile(clientId))
+				continue
+			}
+
 		}
 
 		// intent check vector clock to adjust latest broadcast

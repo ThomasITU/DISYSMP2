@@ -10,6 +10,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"time"
 	"unicode/utf8"
 
 	"github.com/lottejd/DISYSMP2/ChittyChat"
@@ -57,7 +58,6 @@ func main() {
 
 	// constantly updating the latestBroadCast
 	go EvalLatestBroadCast(broadCastBuffer)
-	go EvalConnectedClients(connectedClients)
 
 	Logger("server is running", vectorClock, serverLogFile)
 
@@ -143,10 +143,10 @@ func Broadcast(msg string, clientId int) {
 func EvalLatestBroadCast(broadCastBuffer chan (bufferedMessage)) {
 	for {
 		select {
-			// TODO set evt. sleep time tid
 		case temp := <-broadCastBuffer:
 			latestBroadCast = temp
 			fmt.Println("new broadcast by, " + strconv.Itoa(int(temp.clientId)) + ": " + temp.message)
+			time.Sleep(50 * time.Millisecond)
 		default:
 		}
 	}
@@ -161,10 +161,7 @@ func EvalConnectedClients(connectedClients []int) {
 	// tilføj et lamport clock i serveren, brug lamport clock til jævnligt at tjekke sammen med en time.sleep hver 10'ende sekund
 }
 
-
-//ã
 func ValidateMessage(message string) (bool, error) {
-	// TODO ER DET HER RIGTIGT?
 	valid := utf8.Valid([]byte(message))
 	if !valid {
 		fmt.Println(message)
