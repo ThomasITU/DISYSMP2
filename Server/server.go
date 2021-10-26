@@ -120,10 +120,6 @@ func (s *Server) LeaveChat(ctx context.Context, request *ChittyChat.LeaveChatReq
 	msg := "client: " + strconv.Itoa(int(clientId)) + ", succesfully left the chat"
 	Logger(msg, vectorClock, serverLogFile)
 
-	// "removing client" by setting vectorClock at clientId to 0 -- think of something better
-	// should probably remove this "feature"
-	vectorClock[clientId] = 0
-
 	Broadcast(msg, int(clientId))
 	return &ChittyChat.LeaveResponse{Msg: msg}, nil
 }
@@ -164,6 +160,8 @@ func EvalConnectedClients(connectedClients []int) {
 	// tilføj et lamport clock i serveren, brug lamport clock til jævnligt at tjekke sammen med en time.sleep hver 10'ende sekund
 }
 
+
+//ã
 func ValidateMessage(message string) (bool, error) {
 	valid := utf8.Valid([]byte(message))
 	if !valid {
