@@ -22,11 +22,12 @@ const (
 )
 
 var (
-	clientsConnectedVectorClocks []int32
-	broadCastBuffer              chan (bufferedMessage)
-	clientCount                  int
-	lock                         sync.Mutex
-	latestBroadCast              bufferedMessage
+	vectorClock      []int32
+	connectedClients []int
+	broadCastBuffer  chan (bufferedMessage)
+	clientCount      int
+	lock             sync.Mutex
+	latestBroadCast  bufferedMessage
 )
 
 type Server struct {
@@ -42,7 +43,8 @@ type bufferedMessage struct {
 func main() {
 
 	//init
-	clientsConnectedVectorClocks = make([]int32, 0, 1)
+	connectedClients = make([]int, 0, 1)
+	vectorClock = make([]int32, 0, 1)
 	broadCastBuffer = make(chan bufferedMessage, 10)
 	lock = sync.Mutex{}
 	grpcServer := grpc.NewServer()
@@ -55,8 +57,9 @@ func main() {
 
 	// constantly updating the latestBroadCast
 	go EvalLatestBroadCast(broadCastBuffer)
+	go EvalConnectedClients(connectedClients)
 
-	Logger("server is running", clientsConnectedVectorClocks, serverLogFile)
+	Logger("server is running", vectorClock, serverLogFile)
 
 	// start the service / server on the specific port
 	ChittyChat.RegisterChittyChatServiceServer(grpcServer, &Server{})
@@ -71,6 +74,8 @@ func (s *Server) GetBroadcast(ctx context.Context, _ *ChittyChat.GetBroadcastReq
 		return nil, errors.New("no broadcasts")
 	}
 
+	clientId := latestBroadCast.clientId
+	connectedClients[int(clientId)]++
 	return &ChittyChat.Response{Msg: latestBroadCast.message, ClientId: latestBroadCast.clientId, ClientsConnected: latestBroadCast.vectorTimeStamp}, nil
 }
 
@@ -79,14 +84,14 @@ func (s *Server) Publish(ctx context.Context, message *ChittyChat.PublishRequest
 	if validateMessage {
 		//logging
 		msg := "Request by: " + strconv.Itoa(int(message.GetClientId())) + " was accepted"
-		Logger(msg, clientsConnectedVectorClocks, serverLogFile)
+		Logger(msg, vectorClock, serverLogFile)
 
 		Broadcast(message.GetRequest(), int(message.GetClientId()))
 		return &ChittyChat.Response{Msg: "Request was accepted"}, nil
 	} else {
 		//logging
 		msg := message.GetRequest() + ", error msg " + err.Error()
-		Logger(msg, clientsConnectedVectorClocks, "ServerErrorLog")
+		Logger(msg, vectorClock, "ServerErrorLog")
 
 		return &ChittyChat.Response{Msg: err.Error()}, err
 	}
@@ -95,13 +100,14 @@ func (s *Server) Publish(ctx context.Context, message *ChittyChat.PublishRequest
 func (s *Server) JoinChat(ctx context.Context, _ *ChittyChat.JoinChatRequest) (*ChittyChat.JoinResponse, error) {
 
 	// add a client
-	clientsConnectedVectorClocks = append(clientsConnectedVectorClocks, 0)
+	connectedClients = append(connectedClients, 0)
+	vectorClock = append(vectorClock, 0)
 	clientId := clientCount
 	clientCount++
 
 	//logging
 	msg := "client: " + strconv.Itoa(clientId) + ", succesfully joined the chat"
-	Logger(msg, clientsConnectedVectorClocks, serverLogFile)
+	Logger(msg, vectorClock, serverLogFile)
 
 	Broadcast(msg, clientId)
 	return &ChittyChat.JoinResponse{ClientId: int32(clientId)}, nil
@@ -112,10 +118,7 @@ func (s *Server) LeaveChat(ctx context.Context, request *ChittyChat.LeaveChatReq
 
 	//logging
 	msg := "client: " + strconv.Itoa(int(clientId)) + ", succesfully left the chat"
-	Logger(msg, clientsConnectedVectorClocks, serverLogFile)
-
-	// "removing client" by setting vectorClock at clientId to 0 -- think of something better
-	clientsConnectedVectorClocks[clientId] = 0
+	Logger(msg, vectorClock, serverLogFile)
 
 	Broadcast(msg, int(clientId))
 	return &ChittyChat.LeaveResponse{Msg: msg}, nil
@@ -126,8 +129,8 @@ func Broadcast(msg string, clientId int) {
 	lock.Lock()
 
 	// increment clock and add latest broadcast to the buffer
-	clientsConnectedVectorClocks[clientId]++
-	vectorClock := clientsConnectedVectorClocks
+	vectorClock[clientId]++
+	vectorClock := vectorClock
 	broadCastBuffer <- bufferedMessage{message: msg, vectorTimeStamp: vectorClock, clientId: int32(clientId)}
 
 	//logging
@@ -149,6 +152,17 @@ func EvalLatestBroadCast(broadCastBuffer chan (bufferedMessage)) {
 	}
 }
 
+func EvalConnectedClients(connectedClients []int) {
+	// not implemented
+	// hav et array der svare til alle clienter der har været connected, alla vectorClock
+	// hver gang der bliver kaldt en GetBroadCast increment clientId index i array
+	// hvis et connectedClients index stopper med at vokse med en relativ størrelse
+	// antag at clienten er disconnected, da alle clienter konstant spørger efter opdaternger
+	// tilføj et lamport clock i serveren, brug lamport clock til jævnligt at tjekke sammen med en time.sleep hver 10'ende sekund
+}
+
+
+//ã
 func ValidateMessage(message string) (bool, error) {
 	// TODO ER DET HER RIGTIGT?
 	valid := utf8.Valid([]byte(message))

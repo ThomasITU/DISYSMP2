@@ -51,6 +51,25 @@ func main() {
 		if err != nil {
 			Logger("bad bufio input", FormatLogFile(clientId))
 		}
+		if strings.EqualFold(input, "leave") {
+			fmt.Println("Do you want to leave? \"y/n\"")
+			_reader, err := bufio.NewReader(os.Stdin).ReadString('\n')
+			_input := strings.TrimSuffix(_reader, "\r\n")
+			checkErr(err)
+			if strings.EqualFold(_input, "y") {
+
+				leaveRequest := ChittyChat.LeaveChatRequest{ClientId: int32(clientId)}
+				response, err := chat.LeaveChat(ctx, &leaveRequest)
+				checkErr(err)
+				LoggerVectorClock(response.Msg, lastestClientVectorTimeStamp, clientLogFile)
+
+				//TODO - se lige hvad der sker når man kalder Exit
+				time.Sleep(500 * time.Millisecond)
+				os.Exit(0)
+
+			}
+
+		}
 		if len(input) > 0 {
 			//TODO broadcastes mellemrum?
 			PublishFromClient(input, ctx, chat)
