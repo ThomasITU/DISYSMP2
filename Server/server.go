@@ -140,6 +140,7 @@ func Broadcast(msg string, clientId int) {
 func EvalLatestBroadCast(broadCastBuffer chan (bufferedMessage)) {
 	for {
 		select {
+			// TODO set evt. sleep time tid
 		case temp := <-broadCastBuffer:
 			latestBroadCast = temp
 			fmt.Println("new broadcast by, " + strconv.Itoa(int(temp.clientId)) + ": " + temp.message)
@@ -149,6 +150,7 @@ func EvalLatestBroadCast(broadCastBuffer chan (bufferedMessage)) {
 }
 
 func ValidateMessage(message string) (bool, error) {
+	// TODO ER DET HER RIGTIGT?
 	valid := utf8.Valid([]byte(message))
 	if !valid {
 		fmt.Println(message)

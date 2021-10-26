@@ -47,10 +47,12 @@ func main() {
 		reader, err := bufio.NewReader(os.Stdin).ReadString('\n')
 		// remove newline windows format "\r\n"
 		input := strings.TrimSuffix(reader, "\r\n")
+		//inputMac := strings.TrimSuffix(reader, "\n");
 		if err != nil {
 			Logger("bad bufio input", FormatLogFile(clientId))
 		}
 		if len(input) > 0 {
+			//TODO broadcastes mellemrum?
 			PublishFromClient(input, ctx, chat)
 		}
 	}
