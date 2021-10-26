@@ -23,12 +23,11 @@ const (
 )
 
 var (
-	vectorClock      []int32
-	connectedClients []int
-	broadCastBuffer  chan (bufferedMessage)
-	clientCount      int
-	lock             sync.Mutex
-	latestBroadCast  bufferedMessage
+	vectorClock     []int32
+	broadCastBuffer chan (bufferedMessage)
+	clientCount     int
+	lock            sync.Mutex
+	latestBroadCast bufferedMessage
 )
 
 type Server struct {
@@ -44,7 +43,6 @@ type bufferedMessage struct {
 func main() {
 
 	//init
-	connectedClients = make([]int, 0, 1)
 	vectorClock = make([]int32, 0, 1)
 	broadCastBuffer = make(chan bufferedMessage, 10)
 	lock = sync.Mutex{}
@@ -74,8 +72,6 @@ func (s *Server) GetBroadcast(ctx context.Context, _ *ChittyChat.GetBroadcastReq
 		return nil, errors.New("no broadcasts")
 	}
 
-	clientId := latestBroadCast.clientId
-	connectedClients[int(clientId)]++
 	return &ChittyChat.Response{Msg: latestBroadCast.message, ClientId: latestBroadCast.clientId, ClientsConnected: latestBroadCast.vectorTimeStamp}, nil
 }
 
@@ -83,6 +79,10 @@ func (s *Server) Publish(ctx context.Context, message *ChittyChat.PublishRequest
 	validateMessage, err := ValidateMessage(message.GetRequest())
 	if validateMessage {
 		//logging
+		lock.Lock()
+		vectorClock[int(message.GetClientId())]++
+		lock.Unlock()
+
 		msg := "Request by: " + strconv.Itoa(int(message.GetClientId())) + " was accepted"
 		Logger(msg, vectorClock, serverLogFile)
 
@@ -100,10 +100,12 @@ func (s *Server) Publish(ctx context.Context, message *ChittyChat.PublishRequest
 func (s *Server) JoinChat(ctx context.Context, _ *ChittyChat.JoinChatRequest) (*ChittyChat.JoinResponse, error) {
 
 	// add a client
-	connectedClients = append(connectedClients, 0)
 	vectorClock = append(vectorClock, 0)
 	clientId := clientCount
+	lock.Lock()
+	vectorClock[clientId]++
 	clientCount++
+	lock.Unlock()
 
 	//logging
 	msg := "client: " + strconv.Itoa(clientId) + ", succesfully joined the chat"
@@ -115,6 +117,10 @@ func (s *Server) JoinChat(ctx context.Context, _ *ChittyChat.JoinChatRequest) (*
 
 func (s *Server) LeaveChat(ctx context.Context, request *ChittyChat.LeaveChatRequest) (*ChittyChat.LeaveResponse, error) {
 	clientId := request.GetClientId()
+
+	lock.Lock()
+	vectorClock[int(clientId)]++
+	lock.Unlock()
 
 	//logging
 	msg := "client: " + strconv.Itoa(int(clientId)) + ", succesfully left the chat"
@@ -152,15 +158,7 @@ func EvalLatestBroadCast(broadCastBuffer chan (bufferedMessage)) {
 	}
 }
 
-func EvalConnectedClients(connectedClients []int) {
-	// not implemented
-	// hav et array der svare til alle clienter der har været connected, alla vectorClock
-	// hver gang der bliver kaldt en GetBroadCast increment clientId index i array
-	// hvis et connectedClients index stopper med at vokse med en relativ størrelse
-	// antag at clienten er disconnected, da alle clienter konstant spørger efter opdaternger
-	// tilføj et lamport clock i serveren, brug lamport clock til jævnligt at tjekke sammen med en time.sleep hver 10'ende sekund
-}
-
+//ã
 func ValidateMessage(message string) (bool, error) {
 	valid := utf8.Valid([]byte(message))
 	if !valid {

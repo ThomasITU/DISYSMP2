@@ -20,8 +20,8 @@ const (
 )
 
 var (
-	clientId                     int
-	lastestClientVectorTimeStamp []int32
+	clientId                    int
+	latestClientVectorTimeStamp []int32
 )
 
 func main() {
@@ -62,7 +62,7 @@ func main() {
 				leaveRequest := ChittyChat.LeaveChatRequest{ClientId: int32(clientId)}
 				response, err := chat.LeaveChat(ctx, &leaveRequest)
 				checkErr(err)
-				LoggerVectorClock(response.Msg, lastestClientVectorTimeStamp, clientLogFile)
+				LoggerVectorClock(response.Msg, latestClientVectorTimeStamp, clientLogFile)
 
 				time.Sleep(500 * time.Millisecond)
 				os.Exit(0)
@@ -83,7 +83,7 @@ func GetBroadcast(ctx context.Context, chat ChittyChat.ChittyChatServiceClient) 
 
 		response, err := chat.GetBroadcast(ctx, &ChittyChat.GetBroadcastRequest{})
 		if err != nil {
-			if err == latestError && latestError != nil {
+			if err.Error() == latestError.Error() {
 				// to avoid spamming the log with the same error
 				continue
 			} else {
@@ -97,7 +97,7 @@ func GetBroadcast(ctx context.Context, chat ChittyChat.ChittyChatServiceClient) 
 		// intent check vector clock to adjust latest broadcast
 		broadCastIsNewer := false
 		vectorClockFromServer := response.GetClientsConnected()
-		if len(vectorClockFromServer) > len(lastestClientVectorTimeStamp) {
+		if len(vectorClockFromServer) > len(latestClientVectorTimeStamp) {
 			broadCastIsNewer = true
 		}
 
@@ -106,14 +106,14 @@ func GetBroadcast(ctx context.Context, chat ChittyChat.ChittyChatServiceClient) 
 			if broadCastIsNewer {
 				break latest
 			}
-			if vectorClockFromServer[i] > lastestClientVectorTimeStamp[i] {
+			if vectorClockFromServer[i] > latestClientVectorTimeStamp[i] {
 				broadCastIsNewer = true
 			}
 		}
 		if broadCastIsNewer {
-			lastestClientVectorTimeStamp = vectorClockFromServer
+			latestClientVectorTimeStamp = vectorClockFromServer
 			msg := response.Msg + ", by " + strconv.Itoa(int(response.GetClientId()))
-			LoggerVectorClock(msg, lastestClientVectorTimeStamp, FormatLogFile(clientId))
+			LoggerVectorClock(msg, latestClientVectorTimeStamp, FormatLogFile(clientId))
 		}
 	}
 }
@@ -123,7 +123,7 @@ func PublishFromClient(input string, ctx context.Context, chittyServer ChittyCha
 	response, err := chittyServer.Publish(ctx, inputFromClient)
 	checkErr(err)
 
-	LoggerVectorClock(response.GetMsg(), lastestClientVectorTimeStamp, FormatLogFile(clientId))
+	LoggerVectorClock(response.GetMsg(), latestClientVectorTimeStamp, FormatLogFile(clientId))
 }
 
 func JoinChat(ctx context.Context, chittyServer ChittyChat.ChittyChatServiceClient) {
