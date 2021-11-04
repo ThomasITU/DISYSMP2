@@ -4,36 +4,33 @@ package ChittyChat;
 option go_package = "./ChittyChat";
 
 service ChittyChatService{
-    rpc JoinChat (joinRequest) returns (stream joinResponse) {}
+    rpc JoinChat (joinRequest) returns (stream message) {}
     rpc LeaveChat (leaveChatRequest) returns (leaveChatResponse) {}
-    rpc publish (publishRequest) returns (publishResponse) {}
-}
-
-message broadCastedMessage{
-    string msg = 1;
-    repeated int32 vectorClock = 3; 
+    rpc publish (stream message) returns (publishResponse) {}
 }
 
 message joinRequest{
     string username = 1;
 }
 
-message joinResponse{
+message broadCastMessage{
     string msg = 1;
-    broadCastedMessage streamOfMessages = 2;
-    int32 id = 3;
+    repeated int32 vectorClock = 2; 
+}
+
+
+message message{
+    string username = 1;
+    broadCastMessage msgAndVectorClock = 2;
+    
 }
 
 message leaveChatRequest{
-    int32 id = 1;
+    string username = 1 ;
 }
 
 message leaveChatResponse{
     string msg = 1;
-}
-
-message publishRequest{
-    broadCastedMessage msgAndVectorClock = 1;
 }
 
 message publishResponse{
